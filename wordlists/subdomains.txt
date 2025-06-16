@@ -1,0 +1,8 @@
+www
+admin
+mail
+dev
+test
+blog
+shop
+staging

@@ -1,0 +1,30 @@
+# Python basics
+__pycache__/
+*.py[cod]
+*.pyo
+*.log
+
+# Env
+.env
+venv/
+env/
+
+# IDE and OS stuff
+.vscode/
+.idea/
+.DS_Store
+
+# Database
+*.sqlite3
+*.db
+
+# Reports and output
+/reports/
+*.pdf
+
+# Streamlit
+.streamlit/secrets.toml
+
+# Misc
+*.bak
+*.tmp
