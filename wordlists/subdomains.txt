@@ -6,3 +6,16 @@ test
 blog
 shop
 staging
+login
+dashboard
+portal
+api
+vpn
+cdn
+files
+internal
+secure
+beta
+m
+mobile
+webmail

@@ -2,6 +2,7 @@ import os
 import streamlit as st
 import socket
 
+from pathlib import Path
 from report_generator import generate_word_report
 
 from core import (
@@ -56,20 +57,17 @@ if start_scan and domain:
                     st.json(dns_data["raw"])
                 scan_data["DNS Info"] = dns_data["formatted"]
 
-        # 🔥 Updated Dual-Mode Port Scanning
         with st.spinner("🔍 Scanning Ports (Nmap + Python)..."):
             port_results = port_scanner.port_scan(ip)
 
         st.subheader("🔓 Port Scan Results")
 
-        # Nmap Results
         st.markdown("### 🧠 Nmap Stealth Scan Results")
         for line in port_results["nmap"]["formatted"]:
             st.markdown(f"- {line}")
         with st.expander("📜 Raw Nmap Output"):
             st.json(port_results["nmap"]["raw"])
 
-        # Python Socket Results
         st.markdown("### ⚡ Python Socket Scan Results")
         for line in port_results["python"]["formatted"]:
             st.markdown(f"- {line}")
@@ -85,34 +83,84 @@ if start_scan and domain:
         with st.spinner("🧠 Detecting OS..."):
             os_result = os_detection.detect_os(ip)
             st.subheader("🧬 OS Detection Results")
+
             if os_result["raw"].get("unreachable"):
-                st.error(f"❌ Host {ip} appears to be unreachable.")
+                st.error(f"❌ Host `{ip}` appears to be unreachable. OS detection requires a live target.")
+            elif os_result["raw"].get("error"):
+                st.error(f"🚨 Error during OS detection: {os_result['raw']['error']}")
             else:
+                if "OS Matches" in os_result["raw"] and os_result["raw"]["OS Matches"]:
+                    st.success("✅ OS detection completed successfully.")
+                else:
+                    st.warning("⚠️ No direct OS fingerprint match found. Showing possible hints from fallback methods.")
+
                 for line in os_result["formatted"]:
                     st.markdown(f"- {line}")
+
+                scan_data["OS Detection"] = os_result["formatted"]
+
             with st.expander("🧾 Show Raw JSON Output"):
                 st.json(os_result["raw"])
-            scan_data["OS Detection"] = os_result["formatted"]
+
+
 
         # Subdomain Enumeration
         with st.spinner("🌐 Brute Forcing Subdomains..."):
-            subdomain_result = subdomain_enum.brute_force_subdomains(domain, "path/to/wordlist.txt")
-            st.subheader("🔍 Subdomain Brute Force Results")
-            for line in subdomain_result["formatted"]:
-                st.markdown(f"- {line}")
-            with st.expander("🧾 Show Raw JSON Output"):
-                st.json(subdomain_result["raw"])
-            scan_data["Subdomains"] = subdomain_result["formatted"]
+            wordlist_path = "wordlists/subdomains.txt"
+
+            if not os.path.exists(wordlist_path):
+                st.error(f"❌ Wordlist not found at `{wordlist_path}`. Please check the path.")
+            else:
+                subdomain_result = subdomain_enum.brute_force_subdomains(domain, wordlist_path)
+
+                st.subheader("🔍 Subdomain Brute Force Results")
+
+                raw = subdomain_result["raw"]
+                formatted = subdomain_result["formatted"]
+
+                if any("⚠️ Wildcard DNS" in line for line in formatted):
+                    st.warning("⚠️ Wildcard DNS detected! Results may include false positives.")
+
+                if raw.get("found"):
+                    st.success(f"✅ {len(raw['found'])} subdomains found.")
+                    for line in formatted:
+                        if "🚨 Potential Subdomain Takeover" in line:
+                            st.error(f"🔐 {line}")
+                        elif "✅ Found" in line:
+                            st.markdown(f"- {line}")
+                else:
+                    st.warning("⚠️ No valid subdomains found.")
+
+                scan_data["Subdomains"] = formatted
+
+                with st.expander("🧾 Show Raw JSON Output"):
+                    st.json(raw)
+
+
 
         # Directory Bruteforcing
         with st.spinner("📁 Brute Forcing Directories..."):
-            dir_result = dir_bruteforce.brute_force_dirs(domain, "path/to/wordlist.txt")
-            st.subheader("📂 Directory Brute Force Results")
-            for line in dir_result["formatted"]:
-                st.markdown(f"- {line}")
-            with st.expander("🧾 Show Raw JSON Output"):
-                st.json(dir_result["raw"])
-            scan_data["Directories"] = dir_result["formatted"]
+            wordlist_path = "wordlists/common.txt"
+
+            if not os.path.exists(wordlist_path):
+                st.error(f"❌ Wordlist not found at `{wordlist_path}`. Please check the path.")
+            else:
+                dir_result = dir_bruteforce.brute_force_dirs(domain, wordlist_path)
+                st.subheader("📂 Directory Brute Force Results")
+
+                found = dir_result["raw"].get("found")
+                if found:
+                    st.success(f"✅ {len(found)} directories/files found.")
+                    for line in dir_result["formatted"]:
+                        st.markdown(f"- {line}")
+                    scan_data["Directories"] = dir_result["formatted"]
+                else:
+                    st.warning("⚠️ No accessible directories or files found.")
+
+                with st.expander("🧾 Show Raw JSON Output"):
+                    st.json(dir_result["raw"])
+
+
 
         # Vulnerability Scanning
         with st.spinner("🛡️ Scanning for Basic Vulnerabilities..."):
